@@ -30,11 +30,8 @@ class Lime(Provider):
         covered_circles = []
 
         while lat < city.ne_lat:
-
-            logging.info("new line, lng reset")
-
             lng = city.sw_lng
-            line +=1
+            line += 1
 
             while lng < city.ne_lng:
                 covered = False
@@ -58,10 +55,10 @@ class Lime(Provider):
 
                     furthest_bike = bikes[len(bikes)-1]
                     radius = haversine(furthest_bike["attributes"]["longitude"], furthest_bike["attributes"]["latitude"], lng, lat)
-                    if radius > .5:
-                        radius = .5
+                    if radius > 1:
+                        radius = 1
                     covered_circles.append((lng,lat,radius))
-                    logging.info(f"request {requests_count}: {unknown_bikes} new bikes added, {known_bikes} known bikes seen again, skipping a circle of {radius} km around [{lat},{lng}]")
+                    logging.debug(f"request {requests_count}: {unknown_bikes} new bikes added, {known_bikes} known bikes seen again, skipping a circle of {radius} km around [{lat},{lng}]")
 
                     sleep(random() * 4)
 
@@ -109,7 +106,7 @@ class Lime(Provider):
             return bikes
         else:
             if not retrying:
-                logging.warning(f"problem while getting lime bikes: {r.status_code}, waiting 30 seconds and retrying")
+                logging.info(f"error while getting lime bikes: {r.status_code}, waiting 30 seconds and retrying")
                 # wait 30 sec and retry
                 sleep(30)
                 return self.get_lime_bikes(lat, lng, x, True)

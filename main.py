@@ -26,9 +26,9 @@ class City():
 
 def init_logger():
     logging.basicConfig(level=logging.INFO,handlers=[
-        logging.FileHandler(filename='example.log', mode='w'),
+        logging.FileHandler(filename='example.log', mode='a'),
         logging.StreamHandler()
-    ])
+    ], format="%(asctime)s;%(levelname)s;%(message)s")
 
 
 def save_to_postgres(spls, config):
@@ -52,6 +52,8 @@ def save_to_postgres(spls, config):
 
         conn.commit()
 
+        logging.info(f"{len(spls)} scooters positions logs saved to postgres DB")
+
         # close the communication with the PostgreSQL
         cur.close()
     except (Exception, psycopg2.DatabaseError) as error:
@@ -59,7 +61,6 @@ def save_to_postgres(spls, config):
     finally:
         if conn is not None:
             conn.close()
-            logging.info('Database connection closed.')
 
 
 if __name__ == '__main__':
@@ -76,8 +77,8 @@ if __name__ == '__main__':
                 providers.circ.Circ(config),
                 providers.voi.Voi(config),
                 providers.tier.Tier(config),
-                providers.bird.Bird(config),
-                providers.lime.Lime(config)
+                providers.bird.Bird(config)
+                #providers.lime.Lime(config)
              ],
              tier_city_name="BERLIN",
              ne_lat=52.55225,
@@ -92,7 +93,7 @@ if __name__ == '__main__':
         for provider in city.providers:
             try:
                 spls = provider.get_scooters(city)
-                logging.info(f"{len(spls)} scooter retrieved from {provider.provider}")
+                logging.info(f"{len(spls)} scooters retrieved from {provider.provider}")
                 all_spls.extend(spls)
             except (Exception) as error:
                 logging.error(f"problem by retrieving scooters from {provider.provider}, error: {error}")

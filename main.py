@@ -38,7 +38,7 @@ def save_to_postgres(spls, config):
         params = config['POSTGRES']
 
         # connect to the PostgreSQL server
-        conn = psycopg2.connect(host=params['host'], database=params['database'], user=params['user'])
+        conn = psycopg2.connect(host=params['host'], database=params['database'], user=params['user'], password=params['password'])
 
         # create a cursor
         cur = conn.cursor()

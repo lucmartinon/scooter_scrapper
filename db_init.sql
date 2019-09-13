@@ -1,3 +1,5 @@
+create database scooter_scrapper;
+
 CREATE TABLE scooter_position_logs (
    city VARCHAR(100) NOT NULL,
    provider  VARCHAR(100) NOT NULL,
@@ -8,4 +10,4 @@ CREATE TABLE scooter_position_logs (
    battery_level VARCHAR(50) NULL,
    licence_plate VARCHAR(50) NULL,
    raw_data VARCHAR(2000) NULL
-)
+);

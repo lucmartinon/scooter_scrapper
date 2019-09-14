@@ -1,4 +1,4 @@
-import logging
+import logging, logging.handlers
 from configparser import ConfigParser
 import providers.circ
 import providers.lime
@@ -10,6 +10,8 @@ from typing import Iterable
 from pandas import DataFrame
 from datetime import datetime
 import psycopg2
+import sys
+import os
 
 class City():
     def __init__(self, name: str, lat: float, lng: float, providers: Iterable[Provider], tier_city_name, sw_lat, sw_lng, ne_lat, ne_lng):
@@ -24,9 +26,17 @@ class City():
         self.tier_city_name = tier_city_name
 
 
-def init_logger():
+def init_logger(config):
+    # email_handler = logging.handlers.SMTPHandler(
+    #     mailhost=('smtp.gmail.com', 587),
+    #     fromaddr="af.supp.de@gmail.com",
+    #     toaddrs=config['POSTGRES']['email_error'],
+    #     subject=u"scooter scrapper error!",
+    #     credentials=("af.supp.de@gmail.com", ""))
+    # email_handler.setLevel(logging.ERROR)
+
     logging.basicConfig(level=logging.INFO,handlers=[
-        logging.FileHandler(filename='example.log', mode='a'),
+        logging.FileHandler(filename='scooter_scrapper.log', mode='a'),
         logging.StreamHandler()
     ], format="%(asctime)s;%(levelname)s;%(message)s")
 
@@ -64,10 +74,14 @@ def save_to_postgres(spls, config):
 
 
 if __name__ == '__main__':
-    init_logger()
+    if len(sys.argv) > 1:
+        os.chdir(sys.argv[1])
+
+
+
     config = ConfigParser()
     config.read('settings.ini')
-
+    init_logger(config)
 
     cities = [
         City(name="Berlin",
@@ -77,8 +91,8 @@ if __name__ == '__main__':
                 providers.circ.Circ(config),
                 providers.voi.Voi(config),
                 providers.tier.Tier(config),
-                providers.bird.Bird(config)
-                #providers.lime.Lime(config)
+                providers.bird.Bird(config),
+                providers.lime.Lime(config)
              ],
              tier_city_name="BERLIN",
              ne_lat=52.55225,

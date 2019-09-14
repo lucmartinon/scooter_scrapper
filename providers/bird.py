@@ -36,18 +36,21 @@ class Bird(Provider):
         url = self._base_url + f"bird/nearby?latitude={lat}&longitude={lng}&radius={radius}"
 
         r = requests.get(url, headers=headers)
-        scooters = r.json()["birds"]
         spls = []
-        for scooter in scooters:
-            spls.append(ScooterPositionLog(
-                provider=self.provider,
-                vehicle_id=scooter["id"],
-                city=city.name,
-                lat=scooter["location"]["latitude"],
-                lng=scooter["location"]["longitude"],
-                battery_level=scooter["battery_level"],
-                raw_data=scooter
-            ))
+        if r.status_code == 200:
+            scooters = r.json()["birds"]
+            for scooter in scooters:
+                spls.append(ScooterPositionLog(
+                    provider=self.provider,
+                    vehicle_id=scooter["id"],
+                    city=city.name,
+                    lat=scooter["location"]["latitude"],
+                    lng=scooter["location"]["longitude"],
+                    battery_level=scooter["battery_level"],
+                    raw_data=scooter
+                ))
+        else:
+            logging.warning(f"{r.status_code} received from {self.provider}, body: {r.content}")
         return spls
 
 

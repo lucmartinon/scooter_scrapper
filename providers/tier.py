@@ -1,4 +1,5 @@
 import requests
+import logging
 from providers.provider import Provider, ScooterPositionLog
 
 class Tier(Provider):
@@ -16,18 +17,21 @@ class Tier(Provider):
 
         scooters = r.json()["data"]
         spls = []
-        for scooter in scooters:
-            spls.append(ScooterPositionLog(
-                provider= self.provider,
-                vehicle_id= scooter["id"],
-                city= city.name,
-                lat= scooter["lat"],
-                lng= scooter["lng"],
-                licence_plate=scooter["licencePlate"],
-                battery_level= scooter["batteryLevel"],
-                secondary_id=scooter["code"],
-                raw_data=scooter
-            ))
+        if r.status_code == 200:
+            for scooter in scooters:
+                spls.append(ScooterPositionLog(
+                    provider= self.provider,
+                    vehicle_id= scooter["id"],
+                    city= city.name,
+                    lat= scooter["lat"],
+                    lng= scooter["lng"],
+                    licence_plate=scooter["licencePlate"],
+                    battery_level= scooter["batteryLevel"],
+                    secondary_id=scooter["code"],
+                    raw_data=scooter
+                ))
+        else:
+            logging.warning(f"{r.status_code} received from {self.provider}, body: {r.content}")
         return spls
 
 

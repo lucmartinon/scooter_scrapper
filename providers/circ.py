@@ -22,13 +22,13 @@ class Circ(Provider):
         )
 
         headers= {
-          "Authorization": self.settings.defaults()["circ.access_token"]
+            "Authorization": self.settings.defaults()["circ.access_token"]
         }
 
+        spls = []
         r = requests.get(self._base_url, params=params, headers=headers)
         if r.status_code == 200:
             scooters = r.json()["devices"]
-            spls = []
             for scooter in scooters:
                 spls.append(ScooterPositionLog(
                     provider= self.provider,
@@ -39,10 +39,10 @@ class Circ(Provider):
                     battery_level= scooter["energyLevel"],
                     raw_data=scooter
                 ))
-            return spls
+        else:
+            logging.warning(f"{r.status_code} received from {self.provider}, body: {r.content}")
 
-        elif r.status_code == 401:
-            logging.warning("circ scrapping failed")
+        return spls
 
     def refresh_token(self):
 
@@ -54,14 +54,17 @@ class Circ(Provider):
         data = { "accessToken":  self.settings.defaults()["circ.access_token"],
                  "refreshToken": self.settings.defaults()["circ.refresh_token"]}
 
-        result = requests.post('https://node.goflash.com/login/refresh', headers=headers, data=json.dumps(data))
+        r = requests.post('https://node.goflash.com/login/refresh', headers=headers, data=json.dumps(data))
 
-        data = result.json()
-        self.settings.defaults()["circ.access_token"] = data["accessToken"]
-        self.settings.defaults()["circ.refresh_token"] = data["refreshToken"]
+        if r.status_code == 200:
+            data = r.json()
+            self.settings.defaults()["circ.access_token"] = data["accessToken"]
+            self.settings.defaults()["circ.refresh_token"] = data["refreshToken"]
 
-        with open('settings.ini', 'w') as configfile:
-            self.settings.write(configfile)
+            with open('settings.ini', 'w') as configfile:
+                self.settings.write(configfile)
+        else:
+            logging.warning(f"{r.status_code} received from {self.provider}, body: {r.content}")
 
 
 

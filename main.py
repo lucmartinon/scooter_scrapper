@@ -5,15 +5,11 @@ import providers.lime
 import providers.voi
 import providers.tier
 import providers.bird
-from providers.provider import Provider, ScooterPositionLog
-from typing import Iterable
 from pandas import DataFrame
 from datetime import datetime
 import psycopg2
 import sys
 import os
-import requests
-import csv
 import pandas as pd
 
 

@@ -12,29 +12,45 @@ from datetime import datetime
 import psycopg2
 import sys
 import os
+import requests
+import csv
+import pandas as pd
+
 
 class City():
-    def __init__(self, name: str, lat: float, lng: float, providers: Iterable[Provider], tier_city_name, sw_lat, sw_lng, ne_lat, ne_lng):
-        self.name = name
-        self.lat = lat
-        self.lng = lng
-        self.providers = providers
-        self.sw_lat = sw_lat
-        self.sw_lng = sw_lng
-        self.ne_lat = ne_lat
-        self.ne_lng = ne_lng
-        self.tier_city_name = tier_city_name
+    def __init__(self, city_dict, config):
+        self.name = city_dict['name']
+        self.lat = city_dict['lat']
+        self.lng = city_dict['lng']
+        self.sw_lat = city_dict['sw_lat']
+        self.sw_lng = city_dict['sw_lng']
+        self.ne_lat = city_dict['ne_lat']
+        self.ne_lng = city_dict['ne_lng']
+        self.tier_city_name = city_dict['tier_city_name']
+        self.providers = []
+        if city_dict['bird'] == 1:
+            self.providers.append(providers.bird.Bird(config))
+        if city_dict['tier'] == 1:
+            self.providers.append(providers.tier.Tier(config))
+        if city_dict['lime'] == 1:
+            self.providers.append(providers.lime.Lime(config))
+        if city_dict['circ'] == 1:
+            self.providers.append(providers.circ.Circ(config))
+        if city_dict['voi'] == 1:
+            self.providers.append(providers.voi.Voi(config))
+
+
+
+def get_cities(config):
+    url = config['DEFAULT']['cities_providers_url']
+    df = pd.read_csv(url)
+    cities = []
+    for index, city_dict in df.iterrows():
+        cities.append(City(city_dict, config))
+    return cities
 
 
 def init_logger(config):
-    # email_handler = logging.handlers.SMTPHandler(
-    #     mailhost=('smtp.gmail.com', 587),
-    #     fromaddr="af.supp.de@gmail.com",
-    #     toaddrs=config['POSTGRES']['email_error'],
-    #     subject=u"scooter scrapper error!",
-    #     credentials=("af.supp.de@gmail.com", ""))
-    # email_handler.setLevel(logging.ERROR)
-
     logging.basicConfig(level=logging.INFO,handlers=[
         logging.FileHandler(filename='scooter_scrapper.log', mode='a'),
         logging.StreamHandler()
@@ -77,37 +93,17 @@ if __name__ == '__main__':
     if len(sys.argv) > 1:
         os.chdir(sys.argv[1])
 
-
-
     config = ConfigParser()
     config.read('settings.ini')
     init_logger(config)
 
-    cities = [
-        City(name="Berlin",
-             lat=52.4864452,
-             lng=13.4003343,
-             providers=[
-                providers.circ.Circ(config),
-                providers.voi.Voi(config),
-                providers.tier.Tier(config),
-                providers.bird.Bird(config),
-                providers.lime.Lime(config)
-             ],
-             tier_city_name="BERLIN",
-             ne_lat=52.55225,
-             ne_lng=13.49395,
-             sw_lat=52.46198,
-             sw_lng=13.27010
-             )
-    ]
-
+    cities = get_cities(config)
     all_spls = []
     for city in cities:
         for provider in city.providers:
             try:
                 spls = provider.get_scooters(city)
-                logging.info(f"{len(spls)} scooters retrieved from {provider.provider}")
+                logging.info(f"{city.name}: {len(spls)} scooters retrieved from {provider.provider}")
                 all_spls.extend(spls)
             except (Exception) as error:
                 logging.error(f"problem by retrieving scooters from {provider.provider}, error: {error}")
@@ -119,14 +115,3 @@ if __name__ == '__main__':
     df.to_csv (f'scrapped_data/{ts}_scooter_position_logs.csv.gz', header=True, index=False, compression='gzip')
 
     save_to_postgres(all_spls, config)
-
-
-
-
-
-
-
-
-
-
-

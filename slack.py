@@ -1,11 +1,11 @@
-from slackclient import SlackClient
+import slack
 
 sc = None
 
 def get_sc(config):
     global sc
     if sc is None:
-        sc = SlackClient(config["SLACK"]["token"])
+        sc = slack.SlackClient(config["SLACK"]["token"])
     return sc
 
 def post_message(config, msg):

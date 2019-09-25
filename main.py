@@ -12,7 +12,7 @@ import psycopg2
 import sys
 import os
 import pandas as pd
-import slack
+import slack_connector
 from texttable import Texttable
 
 class City():
@@ -124,7 +124,7 @@ if __name__ == '__main__':
     table = Texttable()
     table.set_cols_align(["l", "c", "c", "c", "c", "c"])
     table.add_rows(logs_rows)
-    slack.post_message(config, "```" + table.draw() + "```")
+    slack_connector.post_message(config, "```" + table.draw() + "```")
     logging.info("\n" + table.draw())
 
     df = DataFrame(all_spls)

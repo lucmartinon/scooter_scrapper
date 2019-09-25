@@ -8,7 +8,7 @@ class Provider():
     def __init__(self, settings):
 
         for setting in self.required_settings:
-            if setting not in settings.defaults():
+            if setting not in settings["PROVIDERS"]:
                 raise Exception(f'{setting} has to be configured')
 
         self.settings = settings

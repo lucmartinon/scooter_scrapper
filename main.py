@@ -5,13 +5,15 @@ import providers.lime
 import providers.voi
 import providers.tier
 import providers.bird
+import providers.hive
 from pandas import DataFrame
 from datetime import datetime
 import psycopg2
 import sys
 import os
 import pandas as pd
-
+import slack
+from texttable import Texttable
 
 class City():
     def __init__(self, city_dict, config):
@@ -38,7 +40,7 @@ class City():
 
 
 def get_cities(config):
-    url = config['DEFAULT']['cities_providers_url']
+    url = config["PROVIDERS"]['cities_providers_url']
     df = pd.read_csv(url)
     cities = []
     for index, city_dict in df.iterrows():
@@ -54,7 +56,7 @@ def init_logger(config):
 
 
 def save_to_postgres(spls, config):
-
+    conn = None
     try:
         # read connection parameters
         params = config['POSTGRES']
@@ -81,7 +83,7 @@ def save_to_postgres(spls, config):
     except (Exception, psycopg2.DatabaseError) as error:
         logging.error(error)
     finally:
-        if conn is not None:
+        if conn:
             conn.close()
 
 
@@ -92,17 +94,38 @@ if __name__ == '__main__':
     config = ConfigParser()
     config.read('settings.ini')
     init_logger(config)
-
     cities = get_cities(config)
     all_spls = []
+
+    #special case for Hive, who gets all data in one request (!)
+    # all_spls.extend(providers.hive.Hive(config).get_scooters())
+    # logging.info(f"{len(all_spls)} scooters retrieved from hive")
+
+    logs_rows = [['City', 'Bird', 'Tier', 'Lime', 'Circ', 'Voi']]
+
     for city in cities:
+        city_log = {"bird":'',"tier":'',"lime":'',"circ":'',"voi":''}
         for provider in city.providers:
             try:
                 spls = provider.get_scooters(city)
                 logging.info(f"{city.name}: {len(spls)} scooters retrieved from {provider.provider}")
                 all_spls.extend(spls)
+
+                if len(spls) > 0:
+                    city_log[provider.provider] = len(spls)
+                else:
+                    city_log[provider.provider] = '╳'
+
             except (Exception) as error:
                 logging.error(f"problem by retrieving scooters from {provider.provider}, error: {error}")
+                city_log[provider.provider] = '╳'
+        logs_rows.append([city.name, city_log["bird"],city_log["tier"],city_log["lime"],city_log["circ"],city_log["voi"]])
+
+    table = Texttable()
+    table.set_cols_align(["l", "c", "c", "c", "c", "c"])
+    table.add_rows(logs_rows)
+    slack.post_message(config, "```" + table.draw() + "```")
+    logging.info("\n" + table.draw())
 
     df = DataFrame(all_spls)
 

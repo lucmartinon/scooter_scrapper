@@ -16,7 +16,7 @@ class Bird(Provider):
     ua = "Bird/4.41.0 (co.bird.Ride; build:37; iOS 12.3.1) Alamofire/4.41.0"
 
     def get_scooters(self, city):
-        bird_token = self.settings.defaults()["bird.token"]
+        bird_token = self.settings["PROVIDERS"]["bird.token"]
         lat = city.lat
         lng = city.lng
         headers = {

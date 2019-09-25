@@ -22,7 +22,7 @@ class Circ(Provider):
         )
 
         headers= {
-            "Authorization": self.settings.defaults()["circ.access_token"]
+            "Authorization": self.settings["PROVIDERS"]["circ.access_token"]
         }
 
         spls = []
@@ -51,15 +51,15 @@ class Circ(Provider):
             'Accept': 'application/json',
         }
 
-        data = { "accessToken":  self.settings.defaults()["circ.access_token"],
-                 "refreshToken": self.settings.defaults()["circ.refresh_token"]}
+        data = { "accessToken":  self.settings["PROVIDERS"]["circ.access_token"],
+                 "refreshToken": self.settings["PROVIDERS"]["PROVIDERS"]["circ.refresh_token"]}
 
         r = requests.post('https://node.goflash.com/login/refresh', headers=headers, data=json.dumps(data))
 
         if r.status_code == 200:
             data = r.json()
-            self.settings.defaults()["circ.access_token"] = data["accessToken"]
-            self.settings.defaults()["circ.refresh_token"] = data["refreshToken"]
+            self.settings["PROVIDERS"]["circ.access_token"] = data["accessToken"]
+            self.settings["PROVIDERS"]["PROVIDERS"]["circ.refresh_token"] = data["refreshToken"]
 
             with open('settings.ini', 'w') as configfile:
                 self.settings.write(configfile)

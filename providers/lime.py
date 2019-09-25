@@ -97,7 +97,7 @@ class Lime(Provider):
         }
         url = self._base_url + "views/map"
         headers = {
-            "authorization": "Bearer " + self.settings.defaults()["lime.token"]
+            "authorization": "Bearer " + self.settings["PROVIDERS"]["lime.token"]
         }
         r = requests.get(url, params=params, headers=headers)
 

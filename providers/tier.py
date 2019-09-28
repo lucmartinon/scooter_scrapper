@@ -1,12 +1,13 @@
 import requests
 import logging
-from providers.provider import Provider, ScooterPositionLog
+from providers.provider import Provider
+from scooter_position_log import ScooterPositionLog
 
 class Tier(Provider):
-    provider = "tier"
+    name = "tier"
     _base_url = "https://platform.tier-services.io/vehicle"
 
-    def get_scooters(self, city):
+    def get_scooters(self, settings, city):
         headers = {
             "X-Api-Key": "bpEUTJEBTf74oGRWxaIcW7aeZMzDDODe1yBoSxi2"
         }
@@ -20,7 +21,7 @@ class Tier(Provider):
         if r.status_code == 200:
             for scooter in scooters:
                 spls.append(ScooterPositionLog(
-                    provider= self.provider,
+                    provider= self.name,
                     vehicle_id= scooter["id"],
                     city= city.name,
                     lat= scooter["lat"],
@@ -31,7 +32,7 @@ class Tier(Provider):
                     raw_data=scooter
                 ))
         else:
-            logging.warning(f"{r.status_code} received from {self.provider}, body: {r.content}")
+            logging.warning(f"{r.status_code} received from {self.name}, body: {r.content}")
         return spls
 
 

@@ -1,22 +1,26 @@
-from providers.provider import Provider, ScooterPositionLog
+from providers.provider import Provider
+from scooter_position_log import ScooterPositionLog
 import requests
 import json
 import logging
 import uuid
 
 
-class Hive(Provider):
-    provider = "hive"
-    _base_url = "https://hive.frontend.fleetbird.eu/api/prod/v1.06/map/cars/"
+class Frontend(Provider):
+    frontend = True
+
+    def __init__(self, name):
+        self.name = name
 
     def get_scooters(self):
-        r = requests.get(self._base_url)
+        url = f'https://{self.name}.frontend.fleetbird.eu/api/prod/v1.06/map/cars/'
+        r = requests.get(url)
         spls = []
         if r.status_code == 200:
             scooters = r.json()
             for scooter in scooters:
                 spls.append(ScooterPositionLog(
-                    provider=self.provider,
+                    provider=self.name,
                     vehicle_id=scooter["carId"],
                     licence_plate=scooter["licencePlate"],
                     city=str.lower(scooter["city"]),
@@ -26,7 +30,7 @@ class Hive(Provider):
                     raw_data=scooter
                 ))
         else:
-            logging.warning(f"{r.status_code} received from {self.provider}, body: {r.content}")
+            logging.warning(f"{r.status_code} received from {self.name}, body: {r.content}")
         return spls
 
 

@@ -10,6 +10,7 @@ Running the main will
 * gather all the bikes of the cities from the spreadsheet (see below), 
 * export all the data to a zipped csv (you can specify the folder in the argument of the main), 
 * insert this data in a postgres DB.
+* send a table with the result of the execution via Slack. This rely on a slack token and and a slack channel in the settings file.
 
 ### painpoints
 #### Lime
@@ -34,6 +35,11 @@ host = localhost
 database = scooter_scrapper
 user = postgres
 password = 
+
+[SLACK]
+token = 
+channel = 
+
 ```
 
 ### cities and providers spreadsheet

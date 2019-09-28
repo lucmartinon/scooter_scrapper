@@ -1,4 +1,5 @@
-from providers.provider import Provider, ScooterPositionLog
+from providers.provider import Provider
+from scooter_position_log import ScooterPositionLog
 import requests
 import json
 import logging
@@ -6,7 +7,7 @@ import uuid
 
 
 class Bird(Provider):
-    provider = "bird"
+    name = "bird"
     _base_url = "https://api.birdapp.com/"
     required_settings = ["bird.token"]
 
@@ -15,8 +16,9 @@ class Bird(Provider):
     platform = "ios"
     ua = "Bird/4.41.0 (co.bird.Ride; build:37; iOS 12.3.1) Alamofire/4.41.0"
 
-    def get_scooters(self, city):
-        bird_token = self.settings["PROVIDERS"]["bird.token"]
+    def get_scooters(self, settings, city):
+        self.check_settings(settings)
+        bird_token = settings["PROVIDERS"]["bird.token"]
         lat = city.lat
         lng = city.lng
         headers = {
@@ -41,7 +43,7 @@ class Bird(Provider):
             scooters = r.json()["birds"]
             for scooter in scooters:
                 spls.append(ScooterPositionLog(
-                    provider=self.provider,
+                    provider=self.name,
                     vehicle_id=scooter["id"],
                     city=city.name,
                     lat=scooter["location"]["latitude"],
@@ -50,7 +52,7 @@ class Bird(Provider):
                     raw_data=scooter
                 ))
         else:
-            logging.warning(f"{r.status_code} received from {self.provider}, body: {r.content}")
+            logging.warning(f"{r.status_code} received from {self.name}, body: {r.content}")
         return spls
 
 

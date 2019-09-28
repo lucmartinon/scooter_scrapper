@@ -1,6 +1,7 @@
 import requests
 import logging
-from providers.provider import Provider, ScooterPositionLog
+from providers.provider import Provider
+from scooter_position_log import ScooterPositionLog
 from random import random
 from time import sleep
 from math import radians, cos, sin, asin, sqrt
@@ -9,11 +10,12 @@ from datetime import datetime
 
 
 class Lime(Provider):
-    provider = "lime"
+    name = "lime"
     _base_url = "https://web-production.lime.bike/api/rider/v1/"
     required_settings = ["lime.token"]
 
-    def get_scooters(self, city):
+    def get_scooters(self, settings, city):
+        super.check_settings(settings)
         ts = datetime.now()
         lat = city.sw_lat
         x = 0.0015
@@ -41,7 +43,7 @@ class Lime(Provider):
                         break
 
                 if not covered:
-                    bikes = self.get_lime_bikes(lat, lng, x, retrying=False)
+                    bikes = self.get_lime_bikes(lat, lng, x, retrying=False, settings=settings)
                     requests_count += 1
                     known_bikes, unknown_bikes = 0,0
                     for scooter in bikes:
@@ -73,7 +75,7 @@ class Lime(Provider):
         for scooter in scooters:
             del scooter["attributes"]['rate_plan_short']
             spls.append(ScooterPositionLog(
-                provider= self.provider,
+                provider= self.name,
                 vehicle_id= scooter["id"],
                 city= city.name,
                 lat= scooter["attributes"]["latitude"],
@@ -85,7 +87,7 @@ class Lime(Provider):
             ))
         return spls
 
-    def get_lime_bikes(self, lat, lng, x, retrying):
+    def get_lime_bikes(self, lat, lng, x, retrying, settings):
         params = {
             "user_latitude": lat,
             "user_longitude": lng,
@@ -97,7 +99,7 @@ class Lime(Provider):
         }
         url = self._base_url + "views/map"
         headers = {
-            "authorization": "Bearer " + self.settings["PROVIDERS"]["lime.token"]
+            "authorization": "Bearer " + settings["PROVIDERS"]["lime.token"]
         }
         r = requests.get(url, params=params, headers=headers)
 
@@ -109,7 +111,7 @@ class Lime(Provider):
                 logging.info(f"error while getting lime bikes: {r.status_code}, waiting 30 seconds and retrying")
                 # wait 30 sec and retry
                 sleep(30)
-                return self.get_lime_bikes(lat, lng, x, True)
+                return self.get_lime_bikes(lat, lng, x, True, settings)
             logging.error(f"problem while getting lime bikes: {r.status_code}, retrying did not solve the problem")
             return []
 

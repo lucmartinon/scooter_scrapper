@@ -1,13 +1,14 @@
 import requests
 import logging
-from providers.provider import Provider, ScooterPositionLog
+from providers.provider import Provider
+from scooter_position_log import ScooterPositionLog
 
 
 class Voi(Provider):
-    provider = "voi"
+    name = "voi"
     _base_url = "https://api.voiapp.io/v1/vehicle/status/ready"
 
-    def get_scooters(self, city):
+    def get_scooters(self, settings, city):
         params = {
             "lat": city.lat,
             "lng": city.lng
@@ -19,7 +20,7 @@ class Voi(Provider):
         if r.status_code == 200:
             for scooter in scooters:
                 spls.append(ScooterPositionLog(
-                    provider= self.provider,
+                    provider= self.name,
                     vehicle_id= scooter["id"],
                     city= city.name,
                     lat= scooter["location"][1],
@@ -29,7 +30,7 @@ class Voi(Provider):
                     raw_data=scooter
                 ))
         else:
-            logging.warning(f"{r.status_code} received from {self.provider}, body: {r.content}")
+            logging.warning(f"{r.status_code} received from {self.name}, body: {r.content}")
         return spls
 
 

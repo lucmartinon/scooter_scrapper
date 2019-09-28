@@ -111,7 +111,7 @@ if __name__ == '__main__':
     logging.info("\n" + table.draw())
 
     ts = datetime.now().isoformat(sep=' ',timespec='seconds')
-    summary = f"Scooter Scrapper Result, run finish: {ts}\n\t{len(spls)} scooter position scrapped\n\t{requests} successful requests"
+    summary = f"Scooter Scrapper Result, run finish: {ts}\n\t{len(all_spls)} scooter position scrapped\n\t{requests} successful requests"
 
     if len(error_rows) > 1:
         error_table = Texttable()

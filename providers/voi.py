@@ -23,8 +23,8 @@ class Voi(Provider):
                     provider= self.name,
                     vehicle_id= scooter["id"],
                     city= city.name,
-                    lat= scooter["location"][1],
-                    lng= scooter["location"][0],
+                    lat= scooter["location"][0],
+                    lng= scooter["location"][1],
                     secondary_id=scooter["short"],
                     battery_level= scooter["battery"],
                     raw_data=scooter

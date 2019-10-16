@@ -14,8 +14,8 @@ def save_to_postgres(spls, config):
         # create a cursor
         cur = conn.cursor()
         sql = """
-        INSERT INTO scooter_position_logs (city, provider, id, secondary_id, location, timestamp, battery_level, licence_plate, raw_data)
-             VALUES (%(city)s, %(provider)s, %(id)s, %(secondary_id)s, point(%(lat)s, %(lng)s), %(timestamp)s, %(battery_level)s, %(licence_plate)s, %(raw_data)s);
+        INSERT INTO scooter_position_logs (city, provider, scooter_id, secondary_id, location, timestamp, battery_level, licence_plate)
+             VALUES (%(city)s, %(provider)s, %(id)s, %(secondary_id)s, point(%(lng)s, %(lat)s), %(timestamp)s, %(battery_level)s, %(licence_plate)s);
         """
         # execute a statement
         for spl in spls:

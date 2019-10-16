@@ -90,8 +90,8 @@ if __name__ == '__main__':
                     city_log[provider.name] = '❌'
                     error = True
 
-            except (Exception) as error:
-                logging.error(f"problem by retrieving scooters from {provider.name}, error: {error}")
+            except (Exception) as err:
+                logging.error(f"problem by retrieving scooters from {provider.name}, error: {err}")
                 city_log[provider.name] = '❌'
                 error = True
 
@@ -99,10 +99,10 @@ if __name__ == '__main__':
             for provider in list(Providers):
                 if not provider.value.frontend:
                     log_row.append(city_log[provider.name])
+
         log_rows.append(log_row)
         if error:
             error_rows.append(log_row)
-
 
     # Making a nice table summarizing results
     table = Texttable()

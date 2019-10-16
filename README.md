@@ -1,6 +1,5 @@
 # scooter_scrapper
 
-## Intro
 The objective of this project is to scrap data of positions of scooters like Lime / Bird / Cird, etc.
 Contrary to a lot of existing projects, the objective here is to get an overview of *all* the scooters of a city and to *store* this data, to be able to analyse it afterwards.
 
@@ -12,14 +11,21 @@ Running the main will
 * insert this data in a postgres DB.
 * send a table with the result of the execution via Slack. This rely on a slack token and and a slack channel in the settings file.
 
-### painpoints
+### Pain points
 #### Lime
 Lime needs a lot of queries because the API responds only 50 bikes at a time, and Berlin has for example around 10k Lime scooters.You need to wait 5 seconds between each query, otherwise you get a 429 error (too many tries).
 We could have a better strategy to query the bike in a smarter way, and use more than 1 account info to make more than 1 request each 5 seconds
 
 But the real problem is that Lime Scooters have no identifying info, so you cannot see the history of a particular scooter. This forbids any life expectancy analysis, which is very problematic since this is one of the main objective of the project.
 
-## Settings file
+#### Bird 
+For some reason, Bird is working only for Berlin. Even after generating another token from another device, I cannot get it to work. 
+
+#### Circ
+For some reason, Circ is working when ran locally, but not from my server. This could be due to Circ detecting from the IP that it is a server, but it's not so sure. 
+
+## Tech Details
+###Settings file
 The Project needs a `settings.ini` file in the project folder that contains the necessary params, especially to make the request of each providers. This file should be as follow:
 
 ```

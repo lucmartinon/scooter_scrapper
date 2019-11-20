@@ -8,6 +8,8 @@ import os
 import pandas as pd
 import slack_connector
 import postgres_connector
+import drive_connector
+import traceback
 from texttable import Texttable
 
 
@@ -38,33 +40,31 @@ def get_cities(config):
 
 
 def init_logger(config):
+
     logging.basicConfig(level=logging.INFO,handlers=[
         logging.FileHandler(filename='scooter_scrapper.log', mode='a'),
         logging.StreamHandler()
     ], format="%(asctime)s;%(levelname)s;%(message)s")
+    logging.getLogger('googleapiclient.discovery_cache').setLevel(logging.ERROR)
 
 
-if __name__ == '__main__':
-    if len(sys.argv) > 1:
-        os.chdir(sys.argv[1])
-
-    settings = ConfigParser()
-    settings.read('settings.ini')
-    init_logger(settings)
-
+def scrap_scooters(settings):
     cities = get_cities(settings)
     all_spls = []
     table_headers = ['City']
     requests = 0
 
-
     for provider in list(Providers):
-        if provider.value.frontend:
-            all_spls.extend(provider.value.get_scooters())
-            logging.info(f"{len(all_spls)} scooters retrieved from {provider.name}")
-            requests += 1
-        else:
-            table_headers.append(provider.name)
+        try:
+            if provider.value.frontend:
+                all_spls.extend(provider.value.get_scooters())
+                logging.info(f"{len(all_spls)} scooters retrieved from {provider.name}")
+                requests += 1
+            else:
+                table_headers.append(provider.name)
+
+        except Exception as err:
+            logging.error(f"problem by retrieving scooters from {provider.name}, error: {err}")
 
     log_rows = [table_headers]
     error_rows = [table_headers]
@@ -90,7 +90,7 @@ if __name__ == '__main__':
                     city_log[provider.name] = '❌'
                     error = True
 
-            except (Exception) as err:
+            except Exception as err:
                 logging.error(f"problem by retrieving scooters from {provider.name}, error: {err}")
                 city_log[provider.name] = '❌'
                 error = True
@@ -121,17 +121,40 @@ if __name__ == '__main__':
 
     logging.info(summary)
 
-    if settings['SLACK']:
+    if 'SLACK' in settings:
         slack_connector.post_message(settings, summary)
 
     # Saving the data as a zipped CSV
     df = DataFrame(all_spls)
     df = DataFrame.from_records([s.to_dict() for s in all_spls])
 
-    df.to_csv (f'scrapped_data/{ts}_scooter_position_logs.csv.gz', header=True, index=False, compression='gzip')
+    df.to_csv(f'scrapped_data/{ts}_scooter_position_logs.csv.gz', header=True, index=False, compression='gzip')
+
+    if 'GOOGLE_DRIVE' in settings:
+        with open(f'scrapped_data/{ts}_scooter_position_logs.csv.gz',"r") as file:
+            drive_connector.upload_file(file, settings)
 
     # Saving the data to Postgres
-    if settings['POSTGRES']:
+    if 'POSTGRES' in settings:
         postgres_connector.save_to_postgres(all_spls, settings)
+
+
+if __name__ == '__main__':
+    if len(sys.argv) > 1:
+        os.chdir(sys.argv[1])
+
+    settings = ConfigParser()
+    settings.read('settings.ini')
+    init_logger(settings)
+
+    try:
+        scrap_scooters(settings)
+    except Exception as err:
+        msg = f"\n❌❌❌❌❌\nUnexpected problem prevented scooter_scrapper termination: ```{traceback.format_exc()}```\n❌❌❌❌❌"
+        logging.error(msg)
+        slack_connector.post_message(settings, msg)
+
+
+
 
 

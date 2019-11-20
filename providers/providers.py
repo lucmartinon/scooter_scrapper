@@ -14,7 +14,6 @@ class Providers(Enum):
     VOI = Voi()
     HIVE = Frontend("hive")
     SCOOTA = Frontend("scoota")
-    UFO = Frontend("ufo")
     ZERO = Frontend("zero")
 
     @property

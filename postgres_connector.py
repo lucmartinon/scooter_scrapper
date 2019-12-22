@@ -1,6 +1,29 @@
 import psycopg2
 import logging
 
+conn = None;
+
+
+def get_cursor(config):
+    global conn
+    if conn is None:
+        # read connection parameters
+        params = config['POSTGRES']
+
+        # connect to the PostgreSQL server
+        conn = psycopg2.connect(host=params['host'], database=params['database'], user=params['user'], password=params['password'])
+        logging.info('connected to db')
+
+    return conn.cursor()
+
+
+def check_spl_unicity(config, spl):
+    cur = get_cursor(config)
+    sql = "select 1 from scooter_position_logs where city = %(city)s and provider = %(provider)s and scooter_id = %(id)s and timestamp = %(timestamp)s"
+    cur.execute(sql, spl)
+    results = cur.fetchall()
+    return len(results) > 0
+
 
 def save_to_postgres(spls, config):
     conn = None
@@ -19,7 +42,12 @@ def save_to_postgres(spls, config):
         """
         # execute a statement
         for spl in spls:
-            cur.execute(sql, spl.to_dict())
+            dict = None
+            if "to_dict" in spl:
+                dict = spl.to_dict()
+            else:
+                dict = spl
+            cur.execute(sql, dict)
 
         conn.commit()
 

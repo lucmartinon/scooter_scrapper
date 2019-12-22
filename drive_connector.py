@@ -15,9 +15,10 @@ def get_drive(settings):
 
 def list_files(settings):
     drive = get_drive(settings)
-    file_list = drive.ListFile({'q': "'root' in parents and trashed=false"}).GetList()
-    for file1 in file_list:
-        print('title: %s, id: %s' % (file1['title'], file1['id']))
+    folder_id = settings["GOOGLE_DRIVE"]["folder_id"]
+    file_list = drive.ListFile({'q': f"\'{folder_id}\' in parents and trashed=false"}).GetList()
+    return file_list
+
 
 
 def upload_file(file, settings):

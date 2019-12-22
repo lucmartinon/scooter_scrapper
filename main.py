@@ -14,7 +14,7 @@ from texttable import Texttable
 
 
 class City:
-    def __init__(self, city_dict, config):
+    def __init__(self, city_dict):
         self.name = city_dict['name']
         self.lat = city_dict['lat']
         self.lng = city_dict['lng']
@@ -23,6 +23,7 @@ class City:
         self.ne_lat = city_dict['ne_lat']
         self.ne_lng = city_dict['ne_lng']
         self.tier_city_name = city_dict['tier_city_name']
+        self.voi_zone_id = city_dict['voi_zone_id']
         self.providers = []
 
         for provider in list(Providers):
@@ -35,11 +36,11 @@ def get_cities(config):
     df = pd.read_csv(url)
     cities = []
     for index, city_dict in df.iterrows():
-        cities.append(City(city_dict, config))
+        cities.append(City(city_dict))
     return cities
 
 
-def init_logger(config):
+def init_logger():
 
     logging.basicConfig(level=logging.INFO,handlers=[
         logging.FileHandler(filename='scooter_scrapper.log', mode='a'),
@@ -125,7 +126,6 @@ def scrap_scooters(settings):
         slack_connector.post_message(settings, summary)
 
     # Saving the data as a zipped CSV
-    df = DataFrame(all_spls)
     df = DataFrame.from_records([s.to_dict() for s in all_spls])
 
     df.to_csv(f'scrapped_data/{ts}_scooter_position_logs.csv.gz', header=True, index=False, compression='gzip')
@@ -139,13 +139,14 @@ def scrap_scooters(settings):
         postgres_connector.save_to_postgres(all_spls, settings)
 
 
+
 if __name__ == '__main__':
     if len(sys.argv) > 1:
         os.chdir(sys.argv[1])
 
+    init_logger()
     settings = ConfigParser()
     settings.read('settings.ini')
-    init_logger(settings)
 
     try:
         scrap_scooters(settings)
@@ -153,8 +154,6 @@ if __name__ == '__main__':
         msg = f"\n❌❌❌❌❌\nUnexpected problem prevented scooter_scrapper termination: ```{traceback.format_exc()}```\n❌❌❌❌❌"
         logging.error(msg)
         slack_connector.post_message(settings, msg)
-
-
 
 
 

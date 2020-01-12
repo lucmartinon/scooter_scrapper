@@ -134,10 +134,13 @@ def scrap_scooters(settings):
         with open(f'scrapped_data/{ts}_scooter_position_logs.csv.gz',"r") as file:
             drive_connector.upload_file(file, settings)
 
-    # Saving the data to Postgres
-    if 'POSTGRES' in settings:
-        postgres_connector.save_to_postgres(all_spls, settings)
+    logging.info(f"File {ts}_scooter_position_logs.csv.gz correctly uploaded to Google Drive.")
 
+
+def get_settings():
+    settings = ConfigParser()
+    settings.read('settings.ini')
+    return settings
 
 
 if __name__ == '__main__':
@@ -145,8 +148,7 @@ if __name__ == '__main__':
         os.chdir(sys.argv[1])
 
     init_logger()
-    settings = ConfigParser()
-    settings.read('settings.ini')
+    settings = get_settings()
 
     try:
         scrap_scooters(settings)

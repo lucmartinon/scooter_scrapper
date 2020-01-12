@@ -1,8 +1,5 @@
 create database scooter_scrapper;
 
-
-
-
 CREATE TABLE scooter_position_logs (
    city VARCHAR(100) NOT NULL,
    provider  VARCHAR(100) NOT NULL,
@@ -14,11 +11,7 @@ CREATE TABLE scooter_position_logs (
    licence_plate VARCHAR(50) NULL
 );
 
-
-insert into scooter_position_logs_2
-    select city, provider, id as scooter_id, secondary_id, location, timestamp, battery_level, licence_plate from scooter_position_logs where provider = 'voi'
+create index scooter_index on scooter_position_logs (city, provider, scooter_id);
 
 
 
-insert into scooter_position_logs_2
-    select city, provider, id as scooter_id, secondary_id, point(location[1], location[0]), timestamp, battery_level, licence_plate from scooter_position_logs where provider != 'voi'

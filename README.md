@@ -8,8 +8,15 @@ Contrary to a lot of existing projects, the objective here is to get an overview
 Running the main will 
 * gather all the bikes of the cities from the spreadsheet (see below), 
 * export all the data to a zipped csv (you can specify the folder in the argument of the main), 
-* insert this data in a postgres DB.
-* send a table with the result of the execution via Slack. This rely on a slack token and and a slack channel in the settings file.
+* upload this CSV to a folder in google drive (you can specify the folder ID + auth stuff in the settings file)
+* send a table with the result of the execution via Slack. This rely on a slack token and and a slack channel ID in the settings file.
+
+In the utils.py file, you will find a method that is meant to run locally, `def import_new_data(settings):
+`. It does the following: 
+* Downloads any file from the Google Drive folder that has not been downloaded already
+* Merge hourly CSVs into daily CSVs, removing the column "raw_data", making them half the size.
+* Loads these daily files to a Postgres DB
+
 
 ### Pain points
 #### Lime
@@ -35,17 +42,22 @@ circ.access_token =
 circ.refresh_token = 
 lime.token = 
 bird.token = 
+voi.authenticationtoken = 
 
 [POSTGRES]
 host = localhost
 database = scooter_scrapper
-user = postgres
+user = 
 password = 
 
 [SLACK]
 token = 
 channel = 
 
+[GOOGLE_DRIVE]
+filename = 
+folder_id = 
+email_user = 
 ```
 
 ### cities and providers spreadsheet
@@ -67,5 +79,5 @@ so for me:
 `0 * * * * /usr/bin/python3 /root/scooter_scrapper/main.py /root/scooter_scrapper`
 
 ## Next Steps
-* add more providers and more cities
-* be smarter about Lime: more users to query faster, better query strategy...
+* fix painpoint
+* start the data analysis

@@ -1,5 +1,6 @@
 import psycopg2
 import logging
+import slack_connector
 
 conn = None;
 
@@ -17,11 +18,21 @@ def get_cursor(config):
     return conn.cursor()
 
 
+def get_max_scooter_ts_in_db(config):
+    cur = get_cursor(config)
+    sql = "select max(timestamp) from scooter_position_logs"
+    cur.execute(sql)
+    result = str(cur.fetchall()[0][0])
+    cur.close()
+    return result
+
+
 def check_spl_unicity(config, spl):
     cur = get_cursor(config)
     sql = "select 1 from scooter_position_logs where city = %(city)s and provider = %(provider)s and scooter_id = %(id)s and timestamp = %(timestamp)s"
     cur.execute(sql, spl)
     results = cur.fetchall()
+    cur.close()
     return len(results) > 0
 
 
@@ -42,8 +53,7 @@ def save_to_postgres(spls, config):
         """
         # execute a statement
         for spl in spls:
-            dict = None
-            if "to_dict" in spl:
+            if getattr(spl, "to_dict", None) is not None:
                 dict = spl.to_dict()
             else:
                 dict = spl
@@ -56,7 +66,9 @@ def save_to_postgres(spls, config):
         # close the communication with the PostgreSQL
         cur.close()
     except (Exception, psycopg2.DatabaseError) as error:
-        logging.error(error)
+        msg = f"\n❌❌❌❌❌\nUnexpected problem prevented scooter_scrapper termination: ```{traceback.format_exc()}```\n❌❌❌❌❌"
+        logging.error(msg)
+        slack_connector.post_message(config, msg)
     finally:
         if conn:
             conn.close()

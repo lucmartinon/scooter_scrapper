@@ -134,7 +134,7 @@ def scrap_scooters(settings):
         with open(f'scrapped_data/{ts}_scooter_position_logs.csv.gz',"r") as file:
             drive_connector.upload_file(file, settings)
 
-    logging.info(f"File {ts}_scooter_position_logs.csv.gz correctly uploaded to Google Drive.")
+    slack_connector.post_message(settings, f"File {ts}_scooter_position_logs.csv.gz correctly uploaded to Google Drive.")
 
 
 def get_settings():

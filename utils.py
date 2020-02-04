@@ -6,6 +6,9 @@ import gzip
 import pandas as pd
 import main
 from datetime import date
+import paramiko
+import time
+import math
 
 dtype = {
     "battery_level": "int64",
@@ -40,10 +43,8 @@ def load_daily_files_to_postgres(settings, dir, last_day_loaded):
     i = 0
     for file in files:
         if file.endswith("_spls.csv.gz") and file[0:10] > last_day_loaded:
-            df = pd.read_csv(gzip.open(dir + file), dtype=dtype)
-            spls = df.to_dict(orient='records')
-            postgres_connector.save_to_postgres(spls, settings)
-            logging.info(f"{file[0:10]}: saved {len(spls)} spls to DB")
+            postgres_connector.load_csv_to_postgres(settings, dir, file)
+
 
 
 def merge_csv_files_per_day(in_dir, out_dir):
@@ -52,6 +53,7 @@ def merge_csv_files_per_day(in_dir, out_dir):
     current_day = None
     current_pd = None
     i = 0
+    j = 0
     file_cnt = len(raw_files)
     for raw_file in raw_files:
         if raw_file.endswith("_scooter_position_logs.csv.gz") and raw_file[0:10] < str(date.today()) and f"{raw_file[0:10]}_spls.csv.gz" not in existing_daily_files:
@@ -64,18 +66,44 @@ def merge_csv_files_per_day(in_dir, out_dir):
                 current_pd.to_csv(f'{out_dir}{current_day}_spls.csv.gz', header=True, index=False, compression='gzip')
                 current_day = file_day
                 current_pd = None
+                j += 1
 
             if current_pd is None: ## start or new daz
                 current_pd = pd.read_csv(gzip.open(in_dir + raw_file))
             else:
                 current_pd = current_pd.append(pd.read_csv(in_dir + raw_file))
-            logging.info(f'Processed file {i}/{file_cnt}: {raw_file}')
+            logging.debug(f'Processed file {i}/{file_cnt}: {raw_file}')
             i += 1
 
     #writing last csv if needed
     if current_pd is not None:
         del current_pd["raw_data"]
         current_pd.to_csv(f'{out_dir}{current_day}_spls.csv.gz', header=True, index=False, compression='gzip')
+        j += 1
+
+    logging.info(f'Reviewed {i} hourly files, created {j} new daily file(s)')
+    return j
+
+
+def send_stat_files_to_server(settings):
+
+    if 'STAT_SERVER' in settings:
+
+        local_path = "/tmp/scooter_summary.csv"
+        remote_path = "/tmp/scooter_summary.csv"
+
+        postgres_connector.run_query(settings, f"COPY (select * from scooter_summary) TO '{local_path}' CSV HEADER")
+
+        ssh = paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        k = paramiko.RSAKey.from_private_key_file(settings['SSH']['file'])
+        ssh.connect(settings['STAT_SERVER']['server'], username=settings['STAT_SERVER']['user'], pkey=k)
+        sftp = ssh.open_sftp()
+        sftp.put(local_path, remote_path)
+        sftp.close()
+        ssh.close()
+        logging.info(f"scooter summary uploaded to remote server")
+        postgres_connector.run_query_on_stat_server(settings, f"delete from scooter_summary; copy scooter_summary from '{local_path}' csv header;")
 
 
 def import_new_data(settings):
@@ -86,16 +114,39 @@ def import_new_data(settings):
     drive_connector.download_new_files(settings, raw_dir, "2020-01-01")
 
     # merge hourly csv files into daily files, removing column "raw_data", only for non existing date before today  (to have only complete days)
-    merge_csv_files_per_day(raw_dir, daily_dir)
+    days_loaded = merge_csv_files_per_day(raw_dir, daily_dir)
 
     # load daily file to DB if they are newer than last data in DB
     last_data_in_db = postgres_connector.get_max_scooter_ts_in_db(settings)
     last_day_loaded = str(last_data_in_db)[0:10]
     logging.info(f"last data in DB: {last_day_loaded}")
     load_daily_files_to_postgres(settings, daily_dir, last_day_loaded)
+    return days_loaded
+
+
+def diff_time(start_time):
+    diff_sec =  time.time() - start_time
+    hour, min, sec = "", "", ""
+    if diff_sec > 3600:
+        hour = f"{math.floor(diff_sec / 3600)}:"
+    if diff_sec > 60:
+        min = f"{math.floor(diff_sec % 3600 / 60)}:"
+    sec = f"{round(diff_sec % 3600 % 60)}"
+    return hour + min + sec
 
 
 if __name__ == '__main__':
+
+    start_time = time.time()
     main.init_logger()
     settings = main.get_settings()
-    import_new_data(settings)
+    logging.info("start local process")
+    days_loaded = import_new_data(settings)
+
+    if days_loaded > 0:
+        view_start_time = time.time()
+        postgres_connector.refresh_views(settings)
+        logging.info(f"wiews refreshed in {diff_time(view_start_time)}")
+        send_stat_files_to_server(settings)
+    sec = time.time() - start_time
+    logging.info(f"end local process after {diff_time(start_time)} - stat DB is up to date until yesterday")

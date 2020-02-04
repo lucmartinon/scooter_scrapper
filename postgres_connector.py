@@ -1,25 +1,51 @@
 import psycopg2
 import logging
 import slack_connector
+import traceback
+import gzip
 
 conn = None;
 
 
-def get_cursor(config):
+def get_conn(settings):
     global conn
     if conn is None:
         # read connection parameters
-        params = config['POSTGRES']
-
+        params = settings['POSTGRES']
         # connect to the PostgreSQL server
-        conn = psycopg2.connect(host=params['host'], database=params['database'], user=params['user'], password=params['password'])
+        conn = psycopg2.connect(host=params['host'], database=params['database'], user=params['user'],
+                                password=params['password'])
         logging.info('connected to db')
+    return conn;
 
-    return conn.cursor()
+
+def get_cursor(settings):
+    return get_conn(settings).cursor()
 
 
-def get_max_scooter_ts_in_db(config):
-    cur = get_cursor(config)
+def refresh_views(settings):
+    run_query(settings, "refresh materialized view city_providers; refresh materialized view scooters")
+
+
+def run_query(settings, query):
+    conn = get_conn(settings)
+    cur = conn.cursor()
+    cur.execute(query)
+    conn.commit()
+    cur.close()
+
+
+def run_query_on_stat_server(settings, query):
+    params = settings['STAT_SERVER']
+    stat_conn = psycopg2.connect(host=params['server'], database=params['database'], user=params['db_user'], password=params['db_password'])
+    cur = stat_conn.cursor()
+    cur.execute(query)
+    stat_conn.commit()
+    cur.close()
+
+
+def get_max_scooter_ts_in_db(settings):
+    cur = get_cursor(settings)
     sql = "select max(timestamp) from scooter_position_logs"
     cur.execute(sql)
     result = str(cur.fetchall()[0][0])
@@ -27,8 +53,8 @@ def get_max_scooter_ts_in_db(config):
     return result
 
 
-def check_spl_unicity(config, spl):
-    cur = get_cursor(config)
+def check_spl_unicity(settings, spl):
+    cur = get_cursor(settings)
     sql = "select 1 from scooter_position_logs where city = %(city)s and provider = %(provider)s and scooter_id = %(id)s and timestamp = %(timestamp)s"
     cur.execute(sql, spl)
     results = cur.fetchall()
@@ -36,11 +62,21 @@ def check_spl_unicity(config, spl):
     return len(results) > 0
 
 
-def save_to_postgres(spls, config):
+def load_csv_to_postgres(settings, dir, file):
+    cur = get_cursor(settings)
+    with gzip.open(dir + file, 'r') as f:
+        next(f)  # Skip the header row.
+        cur.copy_from(f, 'scooter_position_logs', sep=',')
+        conn.commit()
+    cur.close()
+    logging.info(f"{file[0:10]}: saved {cur.rowcount} spls to DB")
+
+
+def save_to_postgres(spls, settings):
     conn = None
     try:
         # read connection parameters
-        params = config['POSTGRES']
+        params = settings['POSTGRES']
 
         # connect to the PostgreSQL server
         conn = psycopg2.connect(host=params['host'], database=params['database'], user=params['user'], password=params['password'])
@@ -68,7 +104,8 @@ def save_to_postgres(spls, config):
     except (Exception, psycopg2.DatabaseError) as error:
         msg = f"\n❌❌❌❌❌\nUnexpected problem prevented scooter_scrapper termination: ```{traceback.format_exc()}```\n❌❌❌❌❌"
         logging.error(msg)
-        slack_connector.post_message(config, msg)
+        slack_connector.post_message(settings, msg)
     finally:
         if conn:
             conn.close()
+

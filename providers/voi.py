@@ -8,8 +8,10 @@ from scooter_position_log import ScooterPositionLog
 class Voi(Provider):
     name = "voi"
     _base_url = "https://api.voiapp.io/v1/"
+    required_settings = ["voi.authenticationToken"]
 
     def get_scooters(self, settings, city):
+        self.check_settings(settings)
         if not city.voi_zone_id > 0:
             logging.warning(f"No voi zone id for city: {city.name}")
             return []

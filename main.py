@@ -7,7 +7,6 @@ import sys
 import os
 import pandas as pd
 import slack_connector
-import postgres_connector
 import drive_connector
 import traceback
 from texttable import Texttable

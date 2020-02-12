@@ -100,22 +100,26 @@ having count(*) > 10
 order by 2 desc;
 
 #RETENTION D90
-select
-*,
-round((provider_total - cum_death) / provider_total,2) still_alive_perc
-from (
-	select
-	provider,
-	observed_life_days ,
-	sum(case when seen_death then 1 else 0 end) deaths,
-	sum(count(*)) over (partition by provider) provider_total,
-	sum(sum(case when seen_death then 1 else 0 end)) over (partition by provider order by observed_life_days RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) cum_death
+with
+numbers as (select * from generate_series(0,90) as day),
+
+scooters as (
+	select *,  (count(*) over (partition by city, provider)) cp_tot
 	from scooter_summary
-	where city <> '' and seen_birth and cp_max_date - birth_date >= 90 and observed_life_days > 0
-	group by 1,2
-	order by 1,2
-) a
-where observed_life_days <= 90
+	left join mass_extinctions using (city, provider, death_date)
+	where seen_birth and observed_life_days > 0 and cp_max_date - birth_date >= 90 and provider in ('tier' , 'voi' , 'circ' , 'hive' )
+	and mass_extinctions.death_date is null
+)
+select
+	day ,
+	provider ,
+	city,
+  cp_tot,
+	cast (sum (case when observed_life_days >= day then 1 else 0 end) as Integer) remaining_scooters,
+  cast (100 * sum (case when observed_life_days >= day then 1 else 0 end) / cp_tot as Integer) remaining_scooter_perc
+from numbers join scooters on true
+where cp_tot >= 60
+group by 1,2,3,4
 
 
 #observable scooter per provider per day
@@ -158,3 +162,71 @@ order by 1,2
 
 
 detecting mass extinctions
+with dates as (SELECT generate_series(date '2019-10-01', date '2020-01-31', '1 day') date )
+select
+city,
+provider,
+date,
+sum(case when date between scooter_first_seen and scooter_last_seen then 1 else 0 end) alive,
+sum(case when date = death_date then 1 else 0 end) deaths,
+sum(case when date = birth_date then 1 else 0 end) birth,
+avg(case when date = death_date then tot_life_days else null end) avg_life_amoung_todays_deaths,
+case
+	when sum(case when date between scooter_first_seen and scooter_last_seen then 1 else 0 end) > 0
+	then 100 * sum(case when date = death_date then 1 else 0 end) / sum(case when date between scooter_first_seen and scooter_last_seen then 1 else 0 end)
+	else 0 end death_perc
+from dates join scooter_summary on (date between cp_min_date and cp_max_date)
+--where city = 'Marseille' and provider = 'voi'
+group by 1,2,3
+order by 8 desc, 5 desc
+
+
+
+deciding at which ratio we should categorize a death a mass extinctionswith dates as (SELECT generate_series(date '2019-10-01', date '2020-01-31', '1 day') date )
+with dates as (SELECT generate_series(date '2019-10-01', date '2020-01-31', '1 day') date )
+select
+death_perc, sum(deaths) cum_death, count(*) cases
+from (
+select
+city,
+provider,
+date,
+sum(case when date between scooter_first_seen and scooter_last_seen then 1 else 0 end) alive,
+sum(case when date = death_date then 1 else 0 end) deaths,
+sum(case when date = birth_date then 1 else 0 end) birth,
+avg(case when date = death_date then scooter_last_seen - scooter_first_seen else null end) avg_life_todays_deaths,
+case
+	when sum(case when date between scooter_first_seen and scooter_last_seen then 1 else 0 end) > 0
+	then 100 * sum(case when date = death_date then 1 else 0 end) / sum(case when date between scooter_first_seen and scooter_last_seen then 1 else 0 end)
+	else 0 end death_perc
+from dates join scooter_summary on (date between cp_min_date and cp_max_date)
+group by 1,2,3
+)a
+where deaths > 5
+group by 1
+order by 1
+
+--> based on this I take 25%
+create materialized view mass_extinctions as (
+with dates as (SELECT cast(generate_series(date '2019-10-01', date '2020-01-31', '1 day') as date) date)
+select
+city,
+provider,
+date death_date
+from (
+select
+city,
+provider,
+date,
+sum(case when date between scooter_first_seen and scooter_last_seen then 1 else 0 end) alive,
+sum(case when date = death_date then 1 else 0 end) deaths,
+sum(case when date = birth_date then 1 else 0 end) births,
+case
+	when sum(case when date between scooter_first_seen and scooter_last_seen then 1 else 0 end) > 0
+	then 100 * sum(case when date = death_date then 1 else 0 end) / sum(case when date between scooter_first_seen and scooter_last_seen then 1 else 0 end)
+	else 0 end death_perc
+from dates join scooter_summary on (date between cp_min_date and cp_max_date)
+group by 1,2,3
+)a
+where deaths > 5 and (death_perc >=25 or (death_perc >= 10 and deaths > 50))
+);

@@ -16,13 +16,11 @@ cp_min_date date not null,
 cp_max_date date not null
 );
 
-
 create materialized view scooters as (
 select distinct
     city, provider, scooter_id,
-    first_value(date(timestamp)) over win scooter_first_seen,
-    last_value(date(timestamp)) over win scooter_last_seen,
-    last_value(timestamp) over win scooter_last_seen_ts,
+    first_value(timestamp) over win scooter_first_seen,
+    last_value(timestamp) over win scooter_last_seen,
     last_value(lng) over win last_lng,
     last_value(lat) over win last_lat
 from scooter_position_logs
@@ -32,39 +30,49 @@ WINDOW win as (partition by city, provider, scooter_id order by timestamp RANGE 
 
 create or replace view scooter_summary as (
 select
-provider, city, scooter_id,
-first_seen,
-last_seen,
-(cp_max_date - scooter_last_seen > 14) seen_death,
-(scooter_first_seen - cp_min_date > 7) seen_birth,
-case when cp_max_date - scooter_last_seen > 14 then scooter_last_seen  end  death_date,
-case when scooter_first_seen - cp_min_date > 7 then scooter_first_seen end birth_date,
-(scooter_last_seen - scooter_first_seen) observed_life_days,
-case when (cp_max_date - scooter_last_seen > 14 and scooter_first_seen - cp_min_date > 7) then (scooter_last_seen - scooter_first_seen) end tot_life_days,
-case when cp_max_date - scooter_last_seen > 14 then last_lat end last_lat_before_death,
-case when cp_max_date - scooter_last_seen > 14 then last_lng end last_lng_before_death,
-cp_max_date,
-cp_min_date
-from scooters
-join city_providers using (city, provider)
+	*,
+	case when seen_death then date(scooter_last_seen)  end  death_date,
+	case when seen_birth then date(scooter_first_seen) end birth_date,
+	case when seen_birth and seen_death then (scooter_last_seen - scooter_first_seen) end tot_life_days,
+	case when seen_death then last_lat end last_lat_before_death,
+	case when seen_death then last_lng end last_lng_before_death,
+	case when seen_death then scooter_last_seen::time end death_time
+
+from (
+	select
+	provider, city, scooter_id,
+	scooter_first_seen,
+	scooter_last_seen,
+	(cp_max_date - date(scooter_last_seen) > 7) seen_death,
+	(date(scooter_first_seen) - cp_min_date > 7) seen_birth,
+	date(scooter_last_seen) - date(scooter_first_seen) observed_life_days,
+	cp_max_date,
+	cp_min_date,
+	last_lat, last_lng
+	from scooters
+	join city_providers using (city, provider)
+) a
 );
 
 create table scooter_summary (
 provider VARCHAR(50) NOT NULL,
 city VARCHAR(50) NOT NULL,
 scooter_id VARCHAR(50) NOT NULL,
-scooter_first_seen DATE NULL,
-scooter_last_seen DATE NULL,
+scooter_first_seen TIMESTAMP NULL,
+scooter_last_seen TIMESTAMP NULL,
 seen_death BOOLEAN NULL,
 seen_birth BOOLEAN NULL,
+observed_life_days INT NOT NULL,
+cp_max_date date not null,
+cp_min_date date not null,
+last_lat FLOAT8 NULL,
+last_lng FLOAT8 NULL,
 death_date DATE NULL,
 birth_date DATE NULL,
-observed_life_days INT NOT NULL,
 tot_life_days INT NULL,
 last_lat_before_death FLOAT8 NULL,
 last_lng_before_death FLOAT8 NULL,
-cp_max_date date not null,
-cp_min_date date not null
+death_time TIME NULL
 );
 
 
@@ -230,3 +238,12 @@ group by 1,2,3
 )a
 where deaths > 5 and (death_perc >=25 or (death_perc >= 10 and deaths > 50))
 );
+
+create view scooter_blacklist as (
+select distinct
+provider, scooter_id, bool_or(me.city is not null) mass_extinct, count(distinct city) > 1 multiple_cities
+from scooter_summary
+left join mass_extinctions me using (provider, city, death_date)
+group by 1,2
+having count(distinct city) > 1 or bool_or(me.city is not null)
+)

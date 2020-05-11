@@ -38,12 +38,13 @@ def upload_all_local_files(settings):
 
 
 def load_daily_files_to_postgres(settings, dir, last_day_loaded):
+    postgres_connector.delete_new_spl(settings)
     files = sorted(os.listdir(dir))
     global dtype
     i = 0
     for file in files:
         if file.endswith("_spls.csv.gz") and file[0:10] > last_day_loaded:
-            postgres_connector.load_csv_to_postgres(settings, dir, file)
+            postgres_connector.load_spl_csv_to_postgres(settings, dir, file)
 
 
 
@@ -56,7 +57,9 @@ def merge_csv_files_per_day(in_dir, out_dir):
     j = 0
     file_cnt = len(raw_files)
     for raw_file in raw_files:
-        if raw_file.endswith("_scooter_position_logs.csv.gz") and raw_file[0:10] < str(date.today()) and f"{raw_file[0:10]}_spls.csv.gz" not in existing_daily_files:
+        if raw_file.endswith("_scooter_position_logs.csv.gz") and raw_file[0:10] < str(date.today()) and f"{raw_file[0:10]}_spls.csv.gz" not in existing_daily_files \
+                and not raw_file[0:13] == "2020-02-21 05":
+
             if current_day is None:
                 current_day = raw_file[0:10]
             file_day = raw_file[0:10]
@@ -106,6 +109,11 @@ def send_stat_files_to_server(settings):
         postgres_connector.run_query_on_stat_server(settings, f"delete from scooter_summary; copy scooter_summary from '{local_path}' csv header;")
 
 
+def refresh_stat_views(settings):
+    if 'STAT_SERVER' in settings:
+        postgres_connector.run_query_on_stat_server(settings, "refresh materialized view mass_extinctions;")
+
+
 def import_new_data(settings):
     raw_dir = "downloaded_data/raw/"
     daily_dir = "downloaded_data/daily/"
@@ -128,11 +136,13 @@ def diff_time(start_time):
     diff_sec =  time.time() - start_time
     hour, min, sec = "", "", ""
     if diff_sec > 3600:
-        hour = f"{math.floor(diff_sec / 3600)}:"
+        hour = f"{math.floor(diff_sec / 3600):02}:"
     if diff_sec > 60:
-        min = f"{math.floor(diff_sec % 3600 / 60)}:"
-    sec = f"{round(diff_sec % 3600 % 60)}"
+        min = f"{math.floor(diff_sec % 3600 / 60):02}:"
+    sec = f"{round(diff_sec % 3600 % 60):02}"
     return hour + min + sec
+
+
 
 
 if __name__ == '__main__':
@@ -143,10 +153,12 @@ if __name__ == '__main__':
     logging.info("start local process")
     days_loaded = import_new_data(settings)
 
-    if days_loaded > 0:
+    if days_loaded >= 0:
         view_start_time = time.time()
         postgres_connector.refresh_views(settings)
         logging.info(f"wiews refreshed in {diff_time(view_start_time)}")
         send_stat_files_to_server(settings)
+        refresh_stat_views(settings)
+
     sec = time.time() - start_time
     logging.info(f"end local process after {diff_time(start_time)} - stat DB is up to date until yesterday")

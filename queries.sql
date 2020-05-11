@@ -16,24 +16,14 @@ cp_min_date date not null,
 cp_max_date date not null
 );
 
-create materialized view scooters as (
-select distinct
-    city, provider, scooter_id,
-    first_value(timestamp) over win scooter_first_seen,
-    last_value(timestamp) over win scooter_last_seen,
-    last_value(lng) over win last_lng,
-    last_value(lat) over win last_lat
-from scooter_position_logs
-where provider <> 'lime' and city <> ''
-WINDOW win as (partition by city, provider, scooter_id order by timestamp RANGE BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING )
-);
+
 
 create or replace view scooter_summary as (
 select
 	*,
 	case when seen_death then date(scooter_last_seen)  end  death_date,
 	case when seen_birth then date(scooter_first_seen) end birth_date,
-	case when seen_birth and seen_death then (scooter_last_seen - scooter_first_seen) end tot_life_days,
+	case when seen_birth and seen_death then (date(scooter_last_seen) - date(scooter_first_seen)) end tot_life_days,
 	case when seen_death then last_lat end last_lat_before_death,
 	case when seen_death then last_lng end last_lng_before_death,
 	case when seen_death then scooter_last_seen::time end death_time
@@ -247,3 +237,39 @@ left join mass_extinctions me using (provider, city, death_date)
 group by 1,2
 having count(distinct city) > 1 or bool_or(me.city is not null)
 )
+
+
+# SCOOTERS init
+
+drop table scooters;
+
+create table scooters as (
+select distinct
+    city, provider, scooter_id,
+    first_value(timestamp) over win scooter_first_seen,
+    last_value(timestamp) over win scooter_last_seen,
+    last_value(lng) over win last_lng,
+    last_value(lat) over win last_lat
+from scooter_position_logs
+where provider <> 'lime' and city <> ''
+WINDOW win as (partition by city, provider, scooter_id order by timestamp RANGE BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING )
+);
+
+ALTER TABLE scooters
+ADD PRIMARY KEY (city, provider, scooter_id);
+
+insert into scooter_test  (
+		select distinct
+			city, provider, scooter_id,
+			first_value(timestamp) over win scooter_first_seen,
+			last_value(timestamp) over win scooter_last_seen,
+			last_value(lng) over win last_lng,
+			last_value(lat) over win last_lat
+		from new_spl
+		where provider <> 'lime' and city <> ''
+		WINDOW win as (partition by city, provider, scooter_id order by timestamp RANGE BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING )
+		)
+on conflict on constraint scooter_test_pkey
+do update
+	set (scooter_last_seen, last_lng, last_lat) = (excluded.scooter_last_seen, excluded.last_lng, excluded.last_lat)
+

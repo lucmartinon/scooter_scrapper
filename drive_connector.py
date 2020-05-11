@@ -28,7 +28,7 @@ def download_new_files(settings, dir, min_date):
     for file in drive_files:
         if file['originalFilename'].endswith("_scooter_position_logs.csv.gz") and file['originalFilename'] not in local_files and file['originalFilename'] > min_date:
             file.GetContentFile(dir + file['originalFilename'])
-            logging.debug('downloaded file ' + file['originalFilename'])
+            logging.info('downloaded file ' + file['originalFilename'])
             i += 1
         else:
             logging.debug(f"skipping {file['originalFilename']}, either not a spl file, or already there, or before min_date")

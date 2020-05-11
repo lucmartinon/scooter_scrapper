@@ -24,7 +24,24 @@ def get_cursor(settings):
 
 
 def refresh_views(settings):
-    run_query(settings, "refresh materialized view city_providers; refresh materialized view scooters")
+    run_query(settings, """
+insert into scooters  (
+    select distinct
+        city, provider, scooter_id,
+        first_value(timestamp) over win scooter_first_seen,
+        last_value(timestamp) over win scooter_last_seen,
+        last_value(lng) over win last_lng,
+        last_value(lat) over win last_lat
+    from new_spl
+    where provider <> 'lime' and city <> ''
+    WINDOW win as (partition by city, provider, scooter_id order by timestamp RANGE BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING )
+    )
+on conflict on constraint scooters_pkey
+do update 
+	set (scooter_last_seen, last_lng, last_lat) = (excluded.scooter_last_seen, excluded.last_lng, excluded.last_lat)
+    """)
+    run_query(settings, "refresh materialized view city_providers;")
+    run_query(settings, "refresh materialized view mass_extinctions;")
 
 
 def run_query(settings, query):
@@ -62,14 +79,20 @@ def check_spl_unicity(settings, spl):
     return len(results) > 0
 
 
-def load_csv_to_postgres(settings, dir, file):
+def delete_new_spl(settings):
+    run_query(settings, "delete from new_spl")
+
+
+def load_spl_csv_to_postgres(settings, dir, file):
     cur = get_cursor(settings)
     with gzip.open(dir + file, 'r') as f:
         next(f)  # Skip the header row.
         cur.copy_from(f, 'scooter_position_logs', sep=',')
+        cur.copy_from(f, 'new_spl', sep=',')
+        logging.info(f"{file[0:10]}: saved {cur.rowcount} spls to DB")
         conn.commit()
     cur.close()
-    logging.info(f"{file[0:10]}: saved {cur.rowcount} spls to DB")
+
 
 
 def save_to_postgres(spls, settings):
